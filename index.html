@@ -789,6 +789,13 @@ input[type=text]::placeholder{color:#7a7a88!important}
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
 
+
+/* Загрузка треков */
+.up input[type=text]{margin-bottom:10px}
+.up select{width:100%;padding:11px 12px;border-radius:12px;background:var(--card);border:0;outline:0;margin-bottom:10px;font-size:15px;color:var(--txt)}
+.up .fl{display:block;font-size:13px;color:var(--mut);margin-bottom:12px}
+.up .fl input{display:block;width:100%;margin-top:6px;padding:10px 12px;border-radius:12px;background:var(--card);color:var(--txt);font-size:14px}
+.up .pill:disabled{opacity:.5}
 </style>
 </head>
 <body>
@@ -1302,9 +1309,10 @@ const MOODS=[
   {id:'Лирика',color:'linear-gradient(135deg,#8e2de2,#4a00e0)',desc:'Чувства'}
 ];
 // Фиксированные вкладки каталога (не сырые genre-строки)
-const CAT_TABS=['Все','Хип-хоп','Поп','Рок','Электро','Lo-Fi','Phonk','Радио'];
+const CAT_TABS=['Все','Сообщество','Хип-хоп','Поп','Рок','Электро','Lo-Fi','Phonk','Радио'];
 
 function mapRuCat(t){
+  if(t._comm&&t.catRu)return t.catRu;
   if(t._radio||t.cat==='Радио')return 'Радио';
   const g=((t.cat||'')+' '+(t.mood||'')+' '+t.t+' '+t.a).toLowerCase();
   if(/phonk|drift/.test(g))return 'Phonk';
@@ -1335,7 +1343,7 @@ home(){
       const m=t.moodRu||mapRuMood(t);
       return m===moodFilter;
     }
-    return cat==='Все'||c===cat;
+    return cat==='Все'||(cat==='Сообщество'?!!t._comm:c===cat);
   }).map(t=>t.id);
   const fav=tracks.filter(t=>S.follows.includes(t.a)).map(t=>t.id);
   const liked=S.likes.filter(id=>reg[id]);
@@ -1372,9 +1380,10 @@ search(){return `<h1>Поиск</h1>
     <button class="${searchTab==='playlists'?'on':''}" onclick="setSearchTab('playlists')">Плейлисты</button>
   </div>
   <div id="res">${searchEmpty()}</div>`},
-lib(){const seg3=[['likes','Лайки'],['pl','Плейлисты'],['art','Исполнители']];
+lib(){const seg3=[['likes','Лайки'],['pl','Плейлисты'],['art','Исполнители'],['up','Загрузить']];
  let body='';
  if(seg=='likes')body=rows(S.likes);
+ if(seg=='up')body=uploadForm();
  if(seg=='art')body=artists().map((a,n)=>`<div class="ah"><span>${esc(a)}</span><button class="chip ${S.follows.includes(a)?'on':''}" onclick="follow(${n})">${S.follows.includes(a)?'Вы подписаны':'Подписаться'}</button></div>${rows(tracks.filter(t=>t.a==a).map(t=>t.id))}`).join('');
  if(seg=='pl')body=`<div class="add"><input type="text" id="np" placeholder="Название плейлиста"><button class="pill" onclick="newPl()">Создать</button></div>`+
   (S.pls.length?S.pls.map((p,k)=>`<div class="ah"><span>${esc(p.n)}</span><button class="chip" onclick="delPl(${k})">Удалить</button></div>${rows(p.ids)}`).join(''):'<div class="empty">Создайте первый плейлист, а добавлять треки можно кнопкой «+» в плеере</div>');
@@ -1608,8 +1617,78 @@ function sheet(){if(!cur)return;
  $('sheet').classList.remove('hide');}
 function addTo(k){const p=S.pls[k];if(!p.ids.includes(cur)){p.ids.push(cur);touch(cur);}save();$('sheet').classList.add('hide');haptic();toast('Добавлено в «'+p.n+'»');render();}
 
+// ===== Треки пользователей (Supabase) =====
+// Вставь сюда данные из своего проекта Supabase (Project Settings → API)
+const SB_URL='https://yhvngsddcddmxljprval.supabase.co';
+const SB_KEY='sb_publishable_xE2-waIpy-F4fnKOTqs58g_sU_bmlM3';
+const SB_ON=()=>/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(SB_URL)&&SB_KEY.length>40;
+const SBH=x=>({apikey:SB_KEY,...(SB_KEY.startsWith('eyJ')?{Authorization:'Bearer '+SB_KEY}:{}),...(x||{})});
+const SB_PUB=()=>SB_URL+'/storage/v1/object/public/tracks/';
+const EXT_A={mp3:'audio/mpeg',m4a:'audio/mp4',ogg:'audio/ogg',wav:'audio/wav'};
+const EXT_I={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp'};
+const extOf=n=>(String(n).split('.').pop()||'').toLowerCase();
+let commTracks=[],upBusy=false;
+
+async function loadComm(){
+  if(!SB_ON())return [];
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/tracks?select=id,title,artist,genre,audio_url,cover_url&approved=eq.true&order=created_at.desc&limit=200`,{headers:SBH(),signal:AbortSignal.timeout?.(10000)});
+    if(!r.ok)return commTracks;
+    const rows=await r.json();
+    commTracks=(rows||[]).filter(x=>typeof x.audio_url==='string'&&x.audio_url.startsWith(SB_PUB())).map(x=>{
+      const cover=(typeof x.cover_url==='string'&&x.cover_url.startsWith(SB_PUB()))?x.cover_url:'';
+      const t={id:'u'+x.id,t:x.title,a:x.artist,cat:x.genre||'Разное',catRu:x.genre||'Разное',img:cover,src:x.audio_url,mood:'Вечер',_comm:true};
+      enrichTrack(t);t._q=1000;return t;
+    });
+    return commTracks;
+  }catch(e){return commTracks;}
+}
+function uploadForm(){
+  if(!SB_ON())return '<div class="empty">Загрузка треков пока не подключена</div>';
+  const gs=['Хип-хоп','Поп','Рок','Электро','Lo-Fi','Phonk','Разное'];
+  return `<div class="up">
+   <div class="empty" style="padding:4px 0 14px;text-align:left">Загрузи свой трек — он сразу появится у всех во вкладке «Сообщество» на главной.</div>
+   <input type="text" id="upT" maxlength="80" placeholder="Название трека">
+   <input type="text" id="upA" maxlength="60" placeholder="Исполнитель" value="${esc(S.nick||tgName)}">
+   <select id="upG">${gs.map(g=>`<option>${g}</option>`).join('')}</select>
+   <label class="fl">Аудио: mp3, m4a, ogg или wav, до 15 МБ<input type="file" id="upF" accept=".mp3,.m4a,.ogg,.wav,audio/*"></label>
+   <label class="fl">Обложка (необязательно): jpg, png или webp, до 3 МБ<input type="file" id="upC" accept=".jpg,.jpeg,.png,.webp"></label>
+   <button class="pill" id="upB" onclick="doUpload()" style="width:100%;padding:13px">Загрузить</button>
+  </div>`;
+}
+async function sbUpload(file,mime,ext){
+  const path=Date.now().toString(36)+Math.random().toString(36).slice(2,10)+'.'+ext;
+  const r=await fetch(`${SB_URL}/storage/v1/object/tracks/${path}`,{method:'POST',headers:SBH({'Content-Type':mime,'x-upsert':'false'}),body:file});
+  if(!r.ok)throw new Error('upload '+r.status);
+  return SB_PUB()+path;
+}
+async function doUpload(){
+  if(upBusy)return;
+  const title=$('upT').value.trim(),artist=$('upA').value.trim(),genre=$('upG').value;
+  const f=$('upF').files[0],c=$('upC').files[0];
+  if(!title||!artist)return toast('Укажи название и исполнителя');
+  if(!f)return toast('Выбери аудиофайл');
+  const fe=extOf(f.name);
+  if(!EXT_A[fe])return toast('Формат: mp3, m4a, ogg или wav');
+  if(f.size>15*1024*1024)return toast('Файл больше 15 МБ');
+  let ce='';
+  if(c){ce=extOf(c.name);if(!EXT_I[ce])return toast('Обложка: jpg, png или webp');if(c.size>3*1024*1024)return toast('Обложка больше 3 МБ');}
+  upBusy=true;const b=$('upB');b.textContent='Загружаем…';b.disabled=true;
+  try{
+    const audio_url=await sbUpload(f,EXT_A[fe],fe);
+    const cover_url=c?await sbUpload(c,EXT_I[ce],ce):null;
+    const r=await fetch(`${SB_URL}/rest/v1/tracks`,{method:'POST',headers:SBH({'Content-Type':'application/json',Prefer:'return=minimal'}),body:JSON.stringify({title,artist,genre,audio_url,cover_url,uploader_id:String(tg?.initDataUnsafe?.user?.id||'')})});
+    if(!r.ok)throw new Error('row '+r.status);
+    haptic();toast('Трек загружен!');
+    const nl=await loadComm();nl.forEach(t=>{reg[t.id]=t;if(!tracks.some(x=>x.id===t.id))tracks.unshift(t);});
+    render();
+  }catch(e){toast('Не удалось загрузить, попробуй ещё раз');}
+  upBusy=false;const b2=$('upB');if(b2){b2.textContent='Загрузить';b2.disabled=false;}
+}
+
 function isRussianTrack(t){
   if(!t)return false;
+  if(t._comm)return true;
   if(t._radio){
     const c=(t.a||'')+' '+(t.t||'');
     return /russia|russian|рус|россия|украин|беларус|казах|\bRU\b|\bUA\b|\bBY\b|\bKZ\b/i.test(c)||/[а-яёА-ЯЁ]/.test(t.t||'');
@@ -1761,7 +1840,8 @@ async function loadNet(silent){
     )
   ];
 
-  await Promise.allSettled([...moodJobs,...extraJobs,...sideJobs]);
+  const commJob=loadComm().then(l=>l.forEach(t=>all.push(t)));
+  await Promise.allSettled([...moodJobs,...extraJobs,...sideJobs,commJob]);
 
   const seen=new Set();
   let list=all.filter(t=>{
