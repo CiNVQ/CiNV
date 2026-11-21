@@ -49,9 +49,11 @@ body.player-open nav,body.player-open #mini{opacity:0;pointer-events:none;transf
 #full{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 26px calc(env(safe-area-inset-bottom,0px) + 30px);background:var(--bg);transform:translateY(100%);visibility:hidden;pointer-events:none;transition:transform .42s cubic-bezier(.2,.8,.2,1),visibility 0s .42s}
 #full.open{transform:none;visibility:visible;pointer-events:auto;transition:transform .42s cubic-bezier(.2,.8,.2,1)}
 #full .top{width:100%;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:15px}
-#disc{width:min(68vw,270px);aspect-ratio:1;border-radius:22px;margin:20px 0;display:grid;place-items:center;font-size:70px;font-weight:600;color:rgba(255,255,255,.85);box-shadow:0 20px 50px rgba(0,0,0,.35);background-size:cover;background-position:center;transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .3s}
-#disc:not(.go){transform:scale(.88)}
-#disc.swap{opacity:0;transform:scale(.8)}
+#disc{width:min(68vw,270px);aspect-ratio:1;border-radius:22px;margin:20px 0;display:grid;place-items:center;font-size:70px;font-weight:600;color:rgba(255,255,255,.85);box-shadow:0 20px 50px rgba(0,0,0,.35);background-size:cover;background-position:center;transition:transform .4s cubic-bezier(.2,.8,.2,1),opacity .35s,box-shadow .5s ease;position:relative}
+#disc::after{content:'';position:absolute;inset:-12px;border-radius:28px;background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.12),transparent 65%);opacity:0;transition:opacity .5s;pointer-events:none;z-index:-1}
+#disc.go::after{opacity:1}
+#disc:not(.go){transform:scale(.9)}
+#disc.swap{opacity:0;transform:scale(.85) translateY(10px)}
 .meta{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .meta b{font-size:22px;font-weight:800;letter-spacing:-.03em;display:block}.meta small{color:var(--mut);font-size:15px}
 #seek{width:100%;margin:22px 0 6px;accent-color:var(--acc)}
@@ -252,6 +254,36 @@ const artists=()=>[...new Set(tracks.map(t=>t.a))];
 let S={likes:[],plays:{},follows:[],pls:[],nick:''};
 function save(){const j=JSON.stringify(S);try{if(j.length<3900)tg?.CloudStorage?.setItem('s',j)}catch(e){}try{localStorage.setItem('s',j)}catch(e){}}
 function migrate(){const m=x=>typeof x==='number'?'d'+(x+1):x;S.likes=S.likes.map(m);const p={};Object.entries(S.plays).forEach(([k,v])=>p[m(isNaN(k)?k:+k)]=v);S.plays=p;S.pls.forEach(l=>l.ids=l.ids.map(m));}
+// Убрать иностранные треки из статистики профиля
+function cleanForeignFromProfile(){
+  let changed=false;
+  const keepId=id=>{
+    const t=reg[id];
+    if(!t)return false; // неизвестный/старый иностранный — выкидываем
+    return isRussianTrack(t);
+  };
+  // plays
+  const np={};
+  Object.entries(S.plays||{}).forEach(([id,n])=>{
+    if(keepId(id)) np[id]=n; else changed=true;
+  });
+  S.plays=np;
+  // likes
+  const nl=(S.likes||[]).filter(id=>{
+    if(keepId(id))return true;
+    changed=true;return false;
+  });
+  S.likes=nl;
+  // playlists
+  (S.pls||[]).forEach(p=>{
+    const before=p.ids.length;
+    p.ids=p.ids.filter(keepId);
+    if(p.ids.length!==before) changed=true;
+  });
+  // follows — оставляем, это имена артистов
+  if(changed) save();
+  return changed;
+}
 function load(cb){let d=false;const fin=v=>{if(d)return;d=true;if(v){try{S={...S,...JSON.parse(v)}}catch(e){}}migrate();cb()};
  let ls=null;try{ls=localStorage.getItem('s')}catch(e){}
  if(tg?.CloudStorage){try{tg.CloudStorage.getItem('s',(e,v)=>fin(v||ls));setTimeout(()=>fin(ls),1500);return}catch(e){}}
@@ -272,13 +304,18 @@ const toastEl=document.createElement('div');toastEl.id='toast';document.body.app
 let tT;function toast(m){toastEl.textContent=m;toastEl.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>toastEl.classList.remove('show'),2800);}
 let fxT;function fx(){const v=$('v');v.classList.remove('enter');void v.offsetWidth;v.classList.add('enter');clearTimeout(fxT);fxT=setTimeout(()=>v.classList.remove('enter'),1000);}
 
-let tab='home',cat='Все',seg='likes',cur=null,pop=null,shuffle=false,repeat=false,curCats=[],moodFilter=null;
+let tab='home',cat='Все',seg='likes',cur=null,pop=null,shuffle=false,repeat=false,curCats=[],moodFilter=null,playContext='';
 let searchTab='tracks', lastQuery='', searchArtists=[], searchPlaylists=[];
 const au=new Audio();
-au.preload='metadata';
+au.preload='auto';
 au.crossOrigin='anonymous';
 // Keep playing in background when possible
-try{au.setAttribute('playsinline','');au.setAttribute('webkit-playsinline','');}catch(e){}
+try{
+  au.setAttribute('playsinline','');
+  au.setAttribute('webkit-playsinline','');
+  au.setAttribute('x-webkit-airplay','allow');
+}catch(e){}
+let wantPlaying=false; // хотим ли продолжать играть (важно в фоне)
 
 // ===== Media Session (шторка / экран блокировки) =====
 function updateMediaSession(){
@@ -320,16 +357,28 @@ function updatePositionState(){
 function setupMediaHandlers(){
   if(!('mediaSession' in navigator))return;
   const h=(action,fn)=>{try{navigator.mediaSession.setActionHandler(action,fn);}catch(e){}};
-  h('play',()=>{au.play().catch(()=>{});updateMediaSession();});
-  h('pause',()=>{au.pause();updateMediaSession();});
-  h('previoustrack',()=>step(-1));
-  h('nexttrack',()=>step(1));
+  h('play',()=>{wantPlaying=true;forcePlay();});
+  h('pause',()=>{wantPlaying=false;au.pause();updateMediaSession();});
+  h('previoustrack',()=>step(-1,true));
+  h('nexttrack',()=>step(1,true));
   h('seekbackward',(d)=>{const off=(d&&d.seekOffset)||10;au.currentTime=Math.max(0,au.currentTime-off);updatePositionState();});
   h('seekforward',(d)=>{const off=(d&&d.seekOffset)||10;au.currentTime=Math.min(au.duration||0,au.currentTime+off);updatePositionState();});
   h('seekto',(d)=>{if(d&&typeof d.seekTime==='number'){au.currentTime=d.seekTime;updatePositionState();}});
-  h('stop',()=>{au.pause();au.currentTime=0;updateMediaSession();});
+  h('stop',()=>{wantPlaying=false;au.pause();au.currentTime=0;updateMediaSession();});
 }
 setupMediaHandlers();
+function forcePlay(){
+  wantPlaying=true;
+  const p=au.play();
+  if(p&&p.then){
+    p.then(()=>updateMediaSession()).catch(()=>{
+      // повтор в фоне через короткий интервал
+      setTimeout(()=>{if(wantPlaying)au.play().catch(()=>{});},250);
+      setTimeout(()=>{if(wantPlaying)au.play().catch(()=>{});},800);
+    });
+  }
+  updateMediaSession();
+}
 
 // ===== Плеер =====
 // Прослушивание считается только если трек доигран до конца (с начала)
@@ -347,49 +396,82 @@ function preloadNext(fromId){
     if(t&&t.src){preloader.src=t.src;preloader.load();}
   }catch(e){}
 }
-function play(id){
+function resetSeekUI(){
+  const seek=$('seek'),c=$('cur'),d=$('dur');
+  if(seek){seek.value=0;}
+  if(c)c.textContent='0:00';
+  if(d)d.textContent='0:00';
+}
+function play(id,ctx,opts){
   if(!reg[id])return;
+  opts=opts||{};
+  if(ctx!==undefined) playContext=ctx;
   const changing=id!==cur;
+  const bg=opts.bg||document.hidden; // фоновый переход — без анимаций
+  wantPlaying=true;
   if(changing){
     const disc=$('disc');
     const mini=$('mini');
-    disc.classList.add('swap');
-    mini?.classList.add('pulse');
-    // start loading immediately (don't wait for animation)
+    if(!bg){
+      disc.classList.add('swap');
+      mini?.classList.add('pulse');
+    }
     cur=id;
     countedFor=null;
     playStartedAt=0;
+    resetSeekUI();
+    // Важно: не рвём цепочку play в фоне
+    try{au.pause();}catch(e){}
     au.src=reg[id].src;
-    au.load();
+    try{au.load();}catch(e){}
     touch(id);
+    ui();
+    updateMediaSession();
     const start=()=>{
-      disc.classList.remove('swap');
-      au.play().catch(()=>{});
+      if(!bg) disc.classList.remove('swap');
+      forcePlay();
       ui();
-      updateMediaSession();
       preloadNext(id);
-      setTimeout(()=>mini?.classList.remove('pulse'),400);
+      if(!bg) setTimeout(()=>mini?.classList.remove('pulse'),400);
     };
-    // if already buffered enough, play faster
     if(au.readyState>=2) start();
     else{
-      const onReady=()=>{au.removeEventListener('canplay',onReady);start();};
+      let done=false;
+      const onReady=()=>{
+        if(done)return;done=true;
+        au.removeEventListener('canplay',onReady);
+        au.removeEventListener('loadeddata',onReady);
+        start();
+      };
       au.addEventListener('canplay',onReady);
-      setTimeout(start,350); // fallback
+      au.addEventListener('loadeddata',onReady);
+      setTimeout(()=>{if(!done){done=true;start();}},bg?600:400);
     }
   }else{
-    au.play().catch(()=>{});
-    updateMediaSession();
+    forcePlay();
   }
-  haptic();
+  if(!bg) haptic();
   if(!changing)ui();
 }
-function toggle(){if(!cur)return play(ids()[0]);au.paused?au.play().catch(()=>{}):au.pause();haptic();updateMediaSession();}
-function step(d){
+function toggle(){
+  if(!cur)return play(ids()[0]);
+  if(au.paused){wantPlaying=true;forcePlay();}
+  else{wantPlaying=false;au.pause();}
+  haptic();
+  updateMediaSession();
+}
+function step(d,fromMedia){
   if(!cur)return;
   const l=ids();
+  if(!l.length)return;
   const p=l.indexOf(cur);
   const n=shuffle?l[Math.floor(Math.random()*l.length)]:l[(p+d+l.length)%l.length];
+  const bg=fromMedia||document.hidden;
+  if(bg){
+    // мгновенно, без анимации — чтобы в шторке не вставало на паузу
+    play(n,playContext,{bg:true});
+    return;
+  }
   const disc=$('disc');
   disc.style.transition='transform .2s cubic-bezier(.2,.8,.2,1),opacity .18s';
   disc.style.transform=`translateX(${d>0?'-16%':'16%'}) scale(.94)`;
@@ -398,8 +480,7 @@ function step(d){
     disc.style.transition='';
     disc.style.transform='';
     disc.style.opacity='';
-    cur=null;
-    play(n);
+    play(n,playContext,{bg:false});
   },160);
 }
 function openFull(v){
@@ -412,9 +493,22 @@ function like(id){if(!id)return;const k=S.likes.indexOf(id);if(k<0){S.likes.push
 function follow(n){const a=artists()[n];const k=S.follows.indexOf(a);k<0?S.follows.push(a):S.follows.splice(k,1);save();render();}
 function ui(){
   const t=reg[cur];
-  if(t){$('mT').textContent=$('fT').textContent=t.t;$('mA').textContent=$('fA').textContent=t.a;
-    $('mC').style.cssText=grad(t);$('mC').textContent=t.img?'':t.t[0];$('disc').style.cssText=grad(t);$('disc').textContent=t.img?'':t.t[0];
-    $('like').classList.toggle('on',S.likes.includes(cur));}
+  if(t){
+    $('mT').textContent=$('fT').textContent=t.t;
+    const sub=playContext?playContext+' · '+t.a:t.a;
+    $('mA').textContent=sub;
+    $('fA').textContent=playContext?playContext+' · '+t.a:t.a;
+    $('mC').style.cssText=grad(t);$('mC').textContent=t.img?'':(t.t[0]||'♪');
+    const disc=$('disc');
+    disc.style.cssText=grad(t)+(t.img?'':';');
+    disc.textContent=t.img?'':(t.t[0]||'♪');
+    // мягкое свечение от обложки
+    if(t.img) disc.style.boxShadow='0 24px 70px rgba(0,0,0,.45), 0 0 40px rgba(255,255,255,.06)';
+    $('like').classList.toggle('on',S.likes.includes(cur));
+    // заголовок полного плеера
+    const topTitle=document.querySelector('#full .top span');
+    if(topTitle) topTitle.textContent=playContext||'Сейчас играет';
+  }
   const ic=au.paused?I.play:I.pause;$('mP').innerHTML=ic;$('pp').innerHTML=ic;$('disc').classList.toggle('go',!au.paused);
   document.querySelectorAll('.item').forEach(el=>{
     const on=el.getAttribute('onclick')?.includes(`'${cur}'`);
@@ -452,22 +546,63 @@ au.addEventListener('pause',()=>{
   countListenIfNeeded();
   ui();
   updateMediaSession();
+  // в фоне при автосмене трека iOS иногда жмёт pause — дожимаем
+  if(wantPlaying&&!au.ended&&document.hidden){
+    setTimeout(()=>{if(wantPlaying&&au.paused)forcePlay();},120);
+    setTimeout(()=>{if(wantPlaying&&au.paused)forcePlay();},500);
+  }
 });
-au.addEventListener('error',()=>{if(cur)toast('Не удалось загрузить трек');});
-au.addEventListener('loadedmetadata',()=>{$('dur').textContent=fmt(au.duration);updatePositionState();});
+au.addEventListener('error',()=>{
+  if(cur)toast('Не удалось загрузить трек');
+  // при ошибке в очереди — попробовать следующий
+  if(wantPlaying) setTimeout(()=>step(1,true),400);
+});
+function validDuration(){
+  const d=au.duration;
+  return d&&isFinite(d)&&d>0&&d<3*3600; // >3ч = стрим/битые метаданные
+}
+au.addEventListener('loadedmetadata',()=>{
+  if(validDuration()){
+    $('dur').textContent=fmt(au.duration);
+    $('seek').value=Math.min(100,(au.currentTime/au.duration)*100);
+  }else{
+    $('dur').textContent=reg[cur]?._radio?'LIVE':'–:––';
+    $('seek').value=0;
+  }
+  updatePositionState();
+});
+au.addEventListener('durationchange',()=>{
+  if(validDuration())$('dur').textContent=fmt(au.duration);
+  else $('dur').textContent=reg[cur]?._radio?'LIVE':'–:––';
+});
 au.addEventListener('timeupdate',()=>{
+  // не тянем старые значения, если трек только сменился
+  if(!cur)return;
   $('cur').textContent=fmt(au.currentTime);
-  if(au.duration)$('seek').value=au.currentTime/au.duration*100;
-  countListenIfNeeded();
+  if(validDuration()){
+    $('seek').value=(au.currentTime/au.duration)*100;
+    $('dur').textContent=fmt(au.duration);
+    countListenIfNeeded();
+  }else{
+    $('seek').value=0;
+  }
   if(!au._lastPos||Date.now()-au._lastPos>1000){au._lastPos=Date.now();updatePositionState();}
 });
 au.addEventListener('ended',()=>{
   countListenIfNeeded();
-  if(repeat){au.currentTime=0;countedFor=null;playStartedAt=0;au.play().catch(()=>{});}
-  else step(1);
+  if(repeat){
+    au.currentTime=0;countedFor=null;playStartedAt=0;
+    wantPlaying=true;forcePlay();
+  }else{
+    // fromMedia=true → без анимации, сразу следующий (важно в шторке)
+    step(1,true);
+  }
+});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&wantPlaying&&au.paused&&cur) forcePlay();
 });
 $('seek').addEventListener('input',e=>{
-  if(au.duration){
+  if(validDuration()){
     au.currentTime=e.target.value/100*au.duration;
     countListenIfNeeded();
     updatePositionState();
@@ -535,11 +670,12 @@ home(){
   const fav=tracks.filter(t=>S.follows.includes(t.a)).map(t=>t.id);
   const liked=S.likes.filter(id=>reg[id]);
   const played=Object.entries(S.plays).sort((a,b)=>b[1]-a[1]).map(e=>e[0]).filter(id=>reg[id]).slice(0,8);
-  const card=id=>{const t=reg[id],pl=id===cur&&!au.paused;return `<button class="card ${pl?'playing':''}" style="${grad(t)}" onclick="play('${id}')"><span class="big-l">${t.img?'':esc(t.t[0])}</span><span class="cap"><b>${esc(t.t)}</b><small>${esc(t.a)}</small></span><span class="cp">${pl?I.pause:I.play}</span></button>`};
+  const playFn=moodFilter?`playMood`:'play';
+  const card=id=>{const t=reg[id],pl=id===cur&&!au.paused;return `<button class="card ${pl?'playing':''}" style="${grad(t)}" onclick="${playFn}('${id}')"><span class="big-l">${t.img?'':esc(t.t[0])}</span><span class="cap"><b>${esc(t.t)}</b><small>${esc(t.a)}</small></span><span class="cp">${pl?I.pause:I.play}</span></button>`};
 
   const moodBlock=MOODS.map(m=>`<button class="mood" style="background:${m.color}" onclick="setMood('${m.id}')"><span>${m.id}</span><small>${m.desc}</small></button>`).join('');
 
-  return `<small class="hi">Привет, ${esc(S.nick||tgName)} · v11</small>
+  return `<small class="hi">Привет, ${esc(S.nick||tgName)} · v14</small>
   <h1 class="xl">${moodFilter?moodFilter:'Что послушаем?'}</h1>
   ${moodFilter?`<div class="chips" style="margin-bottom:12px"><button class="chip on" onclick="setMood(null)">← Назад</button></div>`:''}
   ${!moodFilter?`
@@ -574,9 +710,10 @@ lib(){const seg3=[['likes','Лайки'],['pl','Плейлисты'],['art','И�
   (S.pls.length?S.pls.map((p,k)=>`<div class="ah"><span>${esc(p.n)}</span><button class="chip" onclick="delPl(${k})">Удалить</button></div>${rows(p.ids)}`).join(''):'<div class="empty">Создайте первый плейлист, а добавлять треки можно кнопкой «+» в плеере</div>');
  return `<h1>Моя музыка</h1><div class="chips">${seg3.map(([k,n])=>`<button class="chip ${seg==k?'on':''}" onclick="setSeg('${k}')">${n}</button>`).join('')}</div>${body}`},
 me(){
+ cleanForeignFromProfile();
  const total=Object.values(S.plays).reduce((x,y)=>x+y,0);
  const u=tg?.initDataUnsafe?.user, handle=u?.username?'@'+u.username:'';
- const top=Object.entries(S.plays).sort((x,y)=>y[1]-x[1]).map(e=>e[0]).filter(id=>reg[id]).slice(0,10);
+ const top=Object.entries(S.plays).sort((x,y)=>y[1]-x[1]).map(e=>e[0]).filter(id=>reg[id]&&isRussianTrack(reg[id])).slice(0,10);
  const byA={},byC={};
  Object.entries(S.plays).forEach(([id,n])=>{const t=reg[id];if(t){byA[t.a]=(byA[t.a]||0)+n;byC[t.cat]=(byC[t.cat]||0)+n;}});
  const ta=Object.entries(byA).sort((x,y)=>y[1]-x[1]).slice(0,3);
@@ -622,7 +759,11 @@ function playFlow(){
   const liked=S.likes.filter(id=>reg[id]);
   const played=Object.entries(S.plays).sort((a,b)=>b[1]-a[1]).map(e=>e[0]).filter(id=>reg[id]);
   const pool=[...new Set([...liked,...played,...ids()])];
-  if(pool.length)play(pool[Math.floor(Math.random()*Math.min(pool.length,15))]);
+  if(pool.length)play(pool[Math.floor(Math.random()*Math.min(pool.length,15))],'Твой поток');
+}
+function playMood(id){
+  const m=moodFilter||'Подборка';
+  play(id,m);
 }
 
 // ===== Поиск: треки / артисты / плейлисты =====
@@ -933,9 +1074,12 @@ async function loadNet(silent){
   });
   // 2) Только русские запросы
   const extraQs=[
-    'русский','russian','русский рэп','russian rap','русский хип-хоп',
-    'miyagi','macan','скриптон','instasamka','русский поп','русский рок',
-    'русский phonk','phonk russian','лофи русский','русский trap'
+    'русский','russian','русский рэп','russian rap','русский хип-хоп','russian hip hop',
+    'miyagi','эндшпиль','macan','instasamka','скриптон','morgenshtern',
+    'русский поп','русский рок','русский phonk','phonk russian','лофи русский',
+    'русский trap','xcho','jah khalib','slava marlow','og buda','kizaru',
+    'платина','scally milano','mayot','rakhim','пошлая молли','t-fest',
+    'баста','каста','оксимирон','земля','москва рэп','питер рэп'
   ];
   const extraJobs=extraQs.map(async q=>{
     (await fetchAllSources(q,15)).forEach(t=>all.push(enrichTrack(t)));
@@ -964,8 +1108,8 @@ async function loadNet(silent){
     const oldIds=new Set(tracks.map(t=>t.id));
     const fresh=list.filter(t=>!oldIds.has(t.id));
     tracks=list;
-    // убрать из extra чужие треки
     extra=extra.filter(t=>isRussianTrack(t));
+    cleanForeignFromProfile(); // вычистить иностранные из plays/likes/плейлистов
     if(fresh.length&&silent) toast(`+${fresh.length} русских треков`);
     cat='Все';
   }else if(!silent) toast('Русских треков пока мало — показаны доступные');
