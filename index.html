@@ -100,70 +100,150 @@ body.player-open nav,body.player-open #mini{opacity:0;pointer-events:none;transf
 .wave .pill{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:#fff;color:#000}
 
 /* Welcome */
-#welcome{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .7s cubic-bezier(.2,.8,.2,1),visibility .7s}
+#welcome{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .7s cubic-bezier(.2,.8,.2,1),visibility .7s;overflow:hidden}
+#welcome::before{content:'';position:absolute;inset:-40%;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,.08),transparent 55%),radial-gradient(ellipse at 70% 70%,rgba(120,80,255,.12),transparent 50%),radial-gradient(ellipse at 20% 80%,rgba(0,180,255,.08),transparent 45%);animation:welcomeGlow 8s ease-in-out infinite alternate;pointer-events:none}
 #welcome.hide{opacity:0;visibility:hidden;pointer-events:none}
-#welcome .logo{font-size:42px;font-weight:900;letter-spacing:-.04em;opacity:0;transform:translateY(18px);animation:welIn .8s .15s cubic-bezier(.2,.8,.2,1) forwards}
-#welcome .sub{font-size:17px;color:var(--mut);opacity:0;transform:translateY(12px);animation:welIn .7s .45s cubic-bezier(.2,.8,.2,1) forwards}
-#welcome .name{font-size:22px;font-weight:700;opacity:0;transform:translateY(10px);animation:welIn .7s .7s cubic-bezier(.2,.8,.2,1) forwards}
+#welcome .logo{font-size:48px;font-weight:900;letter-spacing:-.05em;opacity:0;transform:translateY(28px) scale(.92);animation:welIn .9s .2s cubic-bezier(.2,.9,.2,1) forwards;position:relative;z-index:1;text-shadow:0 0 40px rgba(255,255,255,.25)}
+#welcome .sub{font-size:17px;color:var(--mut);opacity:0;transform:translateY(16px);animation:welIn .75s .55s cubic-bezier(.2,.9,.2,1) forwards;position:relative;z-index:1}
+#welcome .name{font-size:24px;font-weight:700;opacity:0;transform:translateY(12px);position:relative;z-index:1;background:linear-gradient(90deg,var(--txt),var(--mut),var(--txt));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:welIn .75s .85s cubic-bezier(.2,.9,.2,1) forwards,shimmerText 3s 1.6s ease-in-out infinite}
 @keyframes welIn{to{opacity:1;transform:none}}
+@keyframes welcomeGlow{0%{transform:scale(1) rotate(0deg);opacity:.7}100%{transform:scale(1.15) rotate(8deg);opacity:1}}
+@keyframes shimmerText{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 
-/* Animations — richer, Spotify/Yandex-like */
+/* Ambient background mesh */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:
+  radial-gradient(ellipse 80% 50% at 20% -10%,rgba(120,90,255,.09),transparent),
+  radial-gradient(ellipse 60% 40% at 90% 10%,rgba(0,160,255,.07),transparent),
+  radial-gradient(ellipse 50% 30% at 50% 100%,rgba(255,80,120,.05),transparent);
+opacity:0;animation:ambientIn 1.4s .3s ease forwards}
+body.player-open::before{opacity:.35;transition:opacity .6s}
+@keyframes ambientIn{to{opacity:1}}
+
+/* Animations — premium */
 .cov,.card,#disc{background-position:center}
-@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
-@keyframes riseSoft{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes riseSoft{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes slideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
-@keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
-.enter>*{animation:rise .48s cubic-bezier(.2,.8,.2,1) both}
-.enter>:nth-child(2){animation-delay:.04s}.enter>:nth-child(3){animation-delay:.08s}.enter>:nth-child(4){animation-delay:.12s}.enter>:nth-child(5){animation-delay:.16s}.enter>:nth-child(6){animation-delay:.2s}.enter>:nth-child(7){animation-delay:.24s}.enter>:nth-child(8){animation-delay:.28s}.enter>:nth-child(n+9){animation-delay:.32s}
-.item{animation:riseSoft .4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes slideUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:none}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+@keyframes softPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes discSpin{to{transform:rotate(360deg)}}
+@keyframes glowPulse{0%,100%{box-shadow:0 20px 50px rgba(0,0,0,.35),0 0 0 0 rgba(255,255,255,.08)}50%{box-shadow:0 28px 70px rgba(0,0,0,.45),0 0 40px 4px rgba(255,255,255,.12)}}
+@keyframes shineSweep{0%{transform:translateX(-120%) skewX(-18deg)}100%{transform:translateX(220%) skewX(-18deg)}}
+@keyframes barDance{0%,100%{height:4px}50%{height:100%}}
+@keyframes navBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.enter>*{animation:rise .52s cubic-bezier(.2,.85,.2,1) both}
+.enter>:nth-child(2){animation-delay:.05s}.enter>:nth-child(3){animation-delay:.09s}.enter>:nth-child(4){animation-delay:.13s}.enter>:nth-child(5){animation-delay:.17s}.enter>:nth-child(6){animation-delay:.21s}.enter>:nth-child(7){animation-delay:.25s}.enter>:nth-child(8){animation-delay:.29s}.enter>:nth-child(n+9){animation-delay:.33s}
+.item{animation:riseSoft .42s cubic-bezier(.2,.85,.2,1) both}
 .item:nth-child(1){animation-delay:.02s}.item:nth-child(2){animation-delay:.05s}.item:nth-child(3){animation-delay:.08s}.item:nth-child(4){animation-delay:.11s}.item:nth-child(5){animation-delay:.14s}.item:nth-child(6){animation-delay:.17s}.item:nth-child(7){animation-delay:.2s}.item:nth-child(8){animation-delay:.23s}.item:nth-child(n+9){animation-delay:.26s}
-.card,.item,.chip,.pill,.ib,nav button,.big,.tabs button,.mood,.wave{transition:transform .2s cubic-bezier(.2,.8,.2,1),background .25s,color .25s,box-shadow .25s,opacity .25s}
-.card:active,.mood:active,.wave:active{transform:scale(.96)}.item:active{transform:scale(.98)}.chip:active,.pill:active,.ib:active,nav button:active,.tabs button:active{transform:scale(.9)}.big:active{transform:scale(.92)}
-@keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.45)}100%{transform:scale(1)}}
-.ib.pop svg{animation:pop .42s cubic-bezier(.3,1.6,.5,1)}
+.card,.item,.chip,.pill,.ib,nav button,.big,.tabs button,.mood,.wave{transition:transform .22s cubic-bezier(.2,.85,.2,1),background .25s,color .25s,box-shadow .3s,opacity .25s,filter .25s}
+.card:active,.mood:active,.wave:active{transform:scale(.96)}.item:active{transform:scale(.985)}.chip:active,.pill:active,.ib:active,nav button:active,.tabs button:active{transform:scale(.9)}.big:active{transform:scale(.92)}
+@keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.5)}100%{transform:scale(1)}}
+.ib.pop svg{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
 .item .eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-right:8px;vertical-align:middle}
-.item .eq b{display:block;width:3px;height:3px;font-size:0;background:var(--txt);border-radius:2px;animation:eq .85s ease-in-out infinite}
-.item .eq b:nth-child(2){animation-delay:.15s}.item .eq b:nth-child(3){animation-delay:.3s}
+.item .eq b{display:block;width:3px;height:3px;font-size:0;background:var(--txt);border-radius:2px;animation:eq .8s ease-in-out infinite}
+.item .eq b:nth-child(2){animation-delay:.12s}.item .eq b:nth-child(3){animation-delay:.24s}
 @keyframes eq{0%,100%{height:3px}50%{height:12px}}
 .item b:has(.eq)::before{display:none}
-@keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}100%{box-shadow:0 0 0 16px rgba(255,255,255,0)}}
-.card.playing .cp{animation:ring 1.5s ease-out infinite}
-.card.sk{background:linear-gradient(100deg,var(--card) 30%,var(--line) 50%,var(--card) 70%);background-size:200% 100%;animation:sh 1.2s linear infinite}
+.item.cur .cov{outline:2px solid var(--acc);outline-offset:2px;box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent);transition:box-shadow .3s,outline .2s}
+.item .cov{transition:transform .25s cubic-bezier(.2,.85,.2,1),box-shadow .3s}
+.item:active .cov{transform:scale(.94)}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}100%{box-shadow:0 0 0 18px rgba(255,255,255,0)}}
+.card.playing .cp{animation:ring 1.6s ease-out infinite}
+.card.sk{background:linear-gradient(100deg,var(--card) 30%,var(--line) 50%,var(--card) 70%);background-size:200% 100%;animation:sh 1.15s linear infinite}
 .card.sk::before{display:none}@keyframes sh{to{background-position:-200% 0}}
-#full.open>:not(#disc){animation:rise .55s cubic-bezier(.2,.8,.2,1) both}
-#full.open>:nth-child(3){animation-delay:.06s}#full.open>:nth-child(4){animation-delay:.1s}#full.open>:nth-child(5){animation-delay:.14s}#full.open>:nth-child(6){animation-delay:.18s}
-#disc{transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .28s,box-shadow .3s}
-#disc.swap{opacity:0;transform:scale(.82) translateY(8px)}
-#disc.go{box-shadow:0 24px 60px rgba(0,0,0,.4)}
-#mini{transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .25s}
-#mini.pulse{animation:miniPulse .5s cubic-bezier(.2,.8,.2,1)}
-@keyframes miniPulse{0%{transform:translateX(-50%) scale(1)}40%{transform:translateX(-50%) scale(1.03)}100%{transform:translateX(-50%) scale(1)}}
+#full.open>:not(#disc){animation:rise .58s cubic-bezier(.2,.85,.2,1) both}
+#full.open>:nth-child(3){animation-delay:.06s}#full.open>:nth-child(4){animation-delay:.11s}#full.open>:nth-child(5){animation-delay:.16s}#full.open>:nth-child(6){animation-delay:.21s}
+
+/* Disc — spin + glow */
+#disc{transition:transform .38s cubic-bezier(.2,.85,.2,1),opacity .3s,box-shadow .4s;position:relative;overflow:hidden;will-change:transform}
+#disc::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(125deg,transparent 35%,rgba(255,255,255,.18) 50%,transparent 65%);opacity:0;transform:translateX(-120%) skewX(-16deg);pointer-events:none;z-index:2}
+#disc.go::before{animation:shineSweep 2.8s 0.4s ease-in-out infinite}
+#disc.swap{opacity:0;transform:scale(.8) translateY(10px)}
+#disc.go{box-shadow:0 24px 60px rgba(0,0,0,.45),0 0 50px rgba(255,255,255,.08);animation:glowPulse 3.2s ease-in-out infinite}
+#disc.go .disc-inner{animation:discSpin 18s linear infinite}
+#disc .disc-inner{width:100%;height:100%;border-radius:inherit;display:grid;place-items:center;background-size:cover;background-position:center;font-size:inherit;font-weight:inherit;color:inherit}
+#disc:not(.go){transform:scale(.94)}
+#disc.go:not(.swap){transform:scale(1)}
+
+/* Mini player */
+#mini{transition:transform .32s cubic-bezier(.2,.85,.2,1),opacity .25s,box-shadow .3s}
+#mini.pulse{animation:miniPulse .55s cubic-bezier(.2,.85,.2,1)}
+#mini.playing{box-shadow:0 4px 28px rgba(0,0,0,.35),0 0 0 1px color-mix(in srgb,var(--acc) 12%,transparent)}
+#mini .cov{transition:transform .3s cubic-bezier(.2,.85,.2,1);position:relative}
+#mini.playing .cov{animation:softPulse 2.4s ease-in-out infinite}
+#mini .mini-bars{display:none;gap:2px;align-items:flex-end;height:14px;margin-right:4px}
+#mini.playing .mini-bars{display:inline-flex}
+#mini .mini-bars i{display:block;width:2.5px;background:var(--txt);border-radius:2px;animation:barDance .7s ease-in-out infinite}
+#mini .mini-bars i:nth-child(1){height:40%;animation-delay:0s}
+#mini .mini-bars i:nth-child(2){height:70%;animation-delay:.15s}
+#mini .mini-bars i:nth-child(3){height:50%;animation-delay:.3s}
+#mini .mini-bars i:nth-child(4){height:90%;animation-delay:.08s}
+@keyframes miniPulse{0%{transform:translateX(-50%) scale(1)}40%{transform:translateX(-50%) scale(1.035)}100%{transform:translateX(-50%) scale(1)}}
+
+/* Mood cards */
+.mood{position:relative;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.mood::before{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%);transform:translateX(-130%) skewX(-18deg);pointer-events:none;z-index:1}
+.mood:active::before{animation:shineSweep .55s ease-out}
+.mood small,.mood span{position:relative;z-index:1}
+
+/* Wave */
+.wave{box-shadow:0 12px 32px rgba(0,0,0,.3);overflow:hidden}
+.wave::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.12) 55%,transparent 70%);transform:translateX(-100%);animation:shineSweep 4.5s 1s ease-in-out infinite;pointer-events:none}
+.wave:active{transform:scale(.97)}
+
+/* Cards */
+.card{box-shadow:0 10px 28px rgba(0,0,0,.28);transition:transform .25s cubic-bezier(.2,.85,.2,1),box-shadow .3s}
+.card:active{box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.card.playing{box-shadow:0 14px 36px rgba(0,0,0,.4),0 0 0 2px color-mix(in srgb,var(--acc) 40%,transparent)}
+.card .cp{transition:transform .2s,background .2s}
+.card.playing .cp{background:var(--txt);color:var(--bg)}
+
+#seek{accent-color:var(--acc);height:4px;border-radius:4px;cursor:pointer;transition:filter .2s}
+#seek:active{filter:brightness(1.15)}
+.times{letter-spacing:.02em}
+.ctl .big{box-shadow:0 8px 28px rgba(0,0,0,.35);transition:transform .2s,box-shadow .3s}
+.ctl .big:active{box-shadow:0 4px 14px rgba(0,0,0,.25)}
+body.player-open .ctl .big{animation:softPulse 2.8s ease-in-out infinite}
+nav button.on{animation:navBob .6s ease}
+nav{backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4)}
+
 @keyframes up{from{transform:translateY(100%)}}@keyframes fade{from{opacity:0}}
-#sheet:not(.hide){animation:fade .22s both}#sheet:not(.hide)>div{animation:up .38s cubic-bezier(.2,.8,.2,1) both}
-#toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%) translateY(-30px);opacity:0;background:var(--txt);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:500;z-index:20;transition:.35s cubic-bezier(.2,.8,.2,1);pointer-events:none;white-space:nowrap}
+#sheet:not(.hide){animation:fade .24s both}#sheet:not(.hide)>div{animation:up .4s cubic-bezier(.2,.85,.2,1) both}
+#toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%) translateY(-30px);opacity:0;background:var(--txt);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;font-weight:500;z-index:20;transition:.38s cubic-bezier(.2,.85,.2,1);pointer-events:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
 .search-wrap{position:relative;margin-bottom:12px}
-.search-wrap input{margin:0;padding-right:40px}
+.search-wrap input{margin:0;padding-right:40px;transition:box-shadow .25s}
+.search-wrap input:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 25%,transparent)}
 .search-wrap .clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:var(--mut);opacity:0;pointer-events:none;transition:.2s}
 .search-wrap.has .clear{opacity:1;pointer-events:auto}
 .nick-row{display:flex;gap:10px;align-items:center}
-.nick-row .pill{opacity:0;pointer-events:none;transform:scale(.9);transition:.25s cubic-bezier(.2,.8,.2,1)}
+.nick-row .pill{opacity:0;pointer-events:none;transform:scale(.9);transition:.28s cubic-bezier(.2,.85,.2,1)}
 .nick-row.dirty .pill{opacity:1;pointer-events:auto;transform:none}
 .s-tabs{display:flex;gap:8px;margin-bottom:14px}
-.s-tabs button{flex:1;padding:8px 0;border-radius:12px;background:var(--card);font-size:13px;font-weight:600;color:var(--mut);transition:.2s}
-.s-tabs button.on{background:var(--txt);color:var(--bg)}
+.s-tabs button{flex:1;padding:8px 0;border-radius:12px;background:var(--card);font-size:13px;font-weight:600;color:var(--mut);transition:.22s}
+.s-tabs button.on{background:var(--txt);color:var(--bg);box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .art-card{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid var(--line);cursor:pointer;animation:riseSoft .4s both}
-.art-card .av{width:48px;height:48px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-weight:700;font-size:18px;background-size:cover;flex:none}
+.art-card .av{width:48px;height:48px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-weight:700;font-size:18px;background-size:cover;flex:none;transition:transform .25s}
+.art-card:active .av{transform:scale(.92)}
 .art-card b{display:block;font-size:16px}.art-card small{color:var(--mut);font-size:12px}
 .pl-card{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid var(--line);cursor:pointer;animation:riseSoft .4s both}
-.pl-card .cov{width:52px;height:52px;border-radius:10px;background:var(--card);display:grid;place-items:center;font-size:20px;background-size:cover;flex:none}
+.pl-card .cov{width:52px;height:52px;border-radius:10px;background:var(--card);display:grid;place-items:center;font-size:20px;background-size:cover;flex:none;transition:transform .25s}
+.pl-card:active .cov{transform:scale(.94)}
 .pl-card b{display:block;font-size:15px}.pl-card small{color:var(--mut);font-size:12px}
 .loading-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--mut);margin:0 2px;animation:dot 1s ease-in-out infinite}
 .loading-dot:nth-child(2){animation-delay:.15s}.loading-dot:nth-child(3){animation-delay:.3s}
 @keyframes dot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 .refresh-hint{text-align:center;font-size:12px;color:var(--mut);padding:8px 0 4px;opacity:.7}
-@media(prefers-reduced-motion:reduce){*,*::before{animation:none!important;transition:none!important}}
+.bar i{transition:width .7s cubic-bezier(.2,.85,.2,1)}
+.ib.on svg{filter:drop-shadow(0 0 6px rgba(255,80,100,.45))}
+:root[data-theme=light] .ib.on svg{filter:drop-shadow(0 0 5px rgba(220,40,60,.35))}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  #disc.go .disc-inner{animation:none!important}
+  body::before{animation:none;opacity:.6}
+}
 </style>
 </head>
 <body>
@@ -177,7 +257,7 @@ body.player-open nav,body.player-open #mini{opacity:0;pointer-events:none;transf
 
 <div id="full">
   <div class="top"><button class="ib" onclick="openFull(false)" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="m15.4 5.4-6.6 6.6 6.6 6.6-1.4 1.4L6 12l8-8z"/></svg></button><span>Сейчас играет</span><button class="ib" onclick="sheet()" aria-label="В плейлист"><svg viewBox="0 0 24 24"><path d="M3 6h12v2H3zm0 4h12v2H3zm0 4h8v2H3zm14-4h2v4h4v2h-4v4h-2v-4h-4v-2h4z"/></svg></button></div>
-  <div id="disc"></div>
+  <div id="disc"><div class="disc-inner" id="discInner"></div></div>
   <div class="meta"><div><b id="fT"></b><small id="fA"></small></div><button class="ib" id="like" onclick="like(cur)" aria-label="Лайк"><svg viewBox="0 0 24 24"><path d="M12 21 10.6 19.7C5.4 15 2 12 2 8.5A5.5 5.5 0 0 1 7.5 3c1.7 0 3.4.8 4.5 2.1A6 6 0 0 1 16.5 3 5.5 5.5 0 0 1 22 8.5c0 3.5-3.4 6.5-8.6 11.2z"/></svg></button></div>
   <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
   <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
@@ -194,6 +274,7 @@ body.player-open nav,body.player-open #mini{opacity:0;pointer-events:none;transf
 <button id="mini" onclick="openFull(true)">
   <div class="cov" id="mC"></div>
   <div class="t"><b id="mT">Выберите трек</b><small id="mA">CiNV</small></div>
+  <span class="mini-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
   <span class="play" id="mP" onclick="event.stopPropagation();toggle()"></span>
 </button>
 <nav id="nav"></nav>
@@ -251,9 +332,41 @@ const ids=()=>[...new Set([...tracks,...extra].map(t=>t.id))];
 const artists=()=>[...new Set(tracks.map(t=>t.a))];
 
 // ===== Сохранение =====
-let S={likes:[],plays:{},follows:[],pls:[],nick:''};
+let S={likes:[],plays:{},follows:[],pls:[],nick:'',last:null};
 function save(){const j=JSON.stringify(S);try{if(j.length<3900)tg?.CloudStorage?.setItem('s',j)}catch(e){}try{localStorage.setItem('s',j)}catch(e){}}
-function migrate(){const m=x=>typeof x==='number'?'d'+(x+1):x;S.likes=S.likes.map(m);const p={};Object.entries(S.plays).forEach(([k,v])=>p[m(isNaN(k)?k:+k)]=v);S.plays=p;S.pls.forEach(l=>l.ids=l.ids.map(m));}
+function migrate(){const m=x=>typeof x==='number'?'d'+(x+1):x;S.likes=S.likes.map(m);const p={};Object.entries(S.plays).forEach(([k,v])=>p[m(isNaN(k)?k:+k)]=v);S.plays=p;S.pls.forEach(l=>l.ids=l.ids.map(m));if(S.last&&S.last.id)S.last.id=m(S.last.id);}
+function saveLast(){
+  if(!cur||!reg[cur])return;
+  S.last={id:cur,time:Math.floor(au.currentTime||0),ctx:playContext||'',at:Date.now()};
+  save();
+}
+function restoreLast(){
+  const L=S.last;
+  if(!L||!L.id||!reg[L.id])return false;
+  cur=L.id;
+  playContext=L.ctx||'';
+  wantPlaying=false;
+  touch(L.id);
+  try{
+    au.src=reg[L.id].src;
+    au.load();
+    const seekTo=Math.max(0,L.time||0);
+    const applyTime=()=>{
+      if(!reg[L.id]._radio&&seekTo>2&&au.duration&&isFinite(au.duration)&&seekTo<au.duration-1){
+        try{au.currentTime=seekTo;}catch(e){}
+      }
+      ui();
+      updateMediaSession();
+    };
+    if(au.readyState>=1) applyTime();
+    else{
+      const once=()=>{au.removeEventListener('loadedmetadata',once);applyTime();};
+      au.addEventListener('loadedmetadata',once);
+      setTimeout(applyTime,1200);
+    }
+  }catch(e){ui();}
+  return true;
+}
 // Убрать иностранные треки из статистики профиля
 function cleanForeignFromProfile(){
   let changed=false;
@@ -425,6 +538,7 @@ function play(id,ctx,opts){
     au.src=reg[id].src;
     try{au.load();}catch(e){}
     touch(id);
+    saveLast();
     ui();
     updateMediaSession();
     const start=()=>{
@@ -500,35 +614,39 @@ function ui(){
     $('fA').textContent=playContext?playContext+' · '+t.a:t.a;
     $('mC').style.cssText=grad(t);$('mC').textContent=t.img?'':(t.t[0]||'♪');
     const disc=$('disc');
-    disc.style.cssText=grad(t)+(t.img?'':';');
-    disc.textContent=t.img?'':(t.t[0]||'♪');
-    // мягкое свечение от обложки
+    const inner=$('discInner')||disc;
+    inner.style.cssText=grad(t)+(t.img?'':';');
+    if(!t.img){inner.textContent=t.t[0]||'♪';}else{inner.textContent='';}
     if(t.img) disc.style.boxShadow='0 24px 70px rgba(0,0,0,.45), 0 0 40px rgba(255,255,255,.06)';
+    else disc.style.boxShadow='';
     $('like').classList.toggle('on',S.likes.includes(cur));
-    // заголовок полного плеера
     const topTitle=document.querySelector('#full .top span');
     if(topTitle) topTitle.textContent=playContext||'Сейчас играет';
   }
-  const ic=au.paused?I.play:I.pause;$('mP').innerHTML=ic;$('pp').innerHTML=ic;$('disc').classList.toggle('go',!au.paused);
+  const playing=!au.paused&&!!cur;
+  const ic=au.paused?I.play:I.pause;
+  $('mP').innerHTML=ic;$('pp').innerHTML=ic;
+  $('disc').classList.toggle('go',playing);
+  const mini=$('mini');if(mini) mini.classList.toggle('playing',playing);
   document.querySelectorAll('.item').forEach(el=>{
     const on=el.getAttribute('onclick')?.includes(`'${cur}'`);
     el.classList.toggle('cur',!!on);
     const b=el.querySelector('b');
     if(!b)return;
     const hasEq=b.querySelector('.eq');
-    if(on&&!au.paused){
+    if(on&&playing){
       if(!hasEq) b.insertAdjacentHTML('afterbegin','<i class="eq"><b></b><b></b><b></b></i>');
     }else if(hasEq) hasEq.remove();
   });
   document.querySelectorAll('.card').forEach(el=>{
     const on=el.getAttribute('onclick')?.includes(`'${cur}'`);
-    el.classList.toggle('playing',!!(on&&!au.paused));
+    el.classList.toggle('playing',!!(on&&playing));
     const cp=el.querySelector('.cp');
-    if(cp) cp.innerHTML=(on&&!au.paused)?I.pause:I.play;
+    if(cp) cp.innerHTML=(on&&playing)?I.pause:I.play;
   });
   updateMediaSession();
 }
-function countListenIfNeeded(){
+function countListenIfNeededfunction countListenIfNeeded(){
   // Считаем прослушивание, если пройдено больше 50% трека
   if(!cur||countedFor===cur||!au.duration||!isFinite(au.duration))return;
   if(au.currentTime/au.duration>=0.5){
@@ -544,6 +662,7 @@ au.addEventListener('play',()=>{
 });
 au.addEventListener('pause',()=>{
   countListenIfNeeded();
+  saveLast();
   ui();
   updateMediaSession();
   // в фоне при автосмене трека iOS иногда жмёт pause — дожимаем
@@ -586,10 +705,13 @@ au.addEventListener('timeupdate',()=>{
   }else{
     $('seek').value=0;
   }
-  if(!au._lastPos||Date.now()-au._lastPos>1000){au._lastPos=Date.now();updatePositionState();}
+  const now=Date.now();
+  if(!au._lastPos||now-au._lastPos>1000){au._lastPos=now;updatePositionState();}
+  if(!au._lastSave||now-au._lastSave>8000){au._lastSave=now;saveLast();}
 });
 au.addEventListener('ended',()=>{
   countListenIfNeeded();
+  saveLast();
   if(repeat){
     au.currentTime=0;countedFor=null;playStartedAt=0;
     wantPlaying=true;forcePlay();
@@ -599,13 +721,16 @@ au.addEventListener('ended',()=>{
   }
 });
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&wantPlaying&&au.paused&&cur) forcePlay();
+  if(document.hidden){saveLast();}
+  else if(wantPlaying&&au.paused&&cur) forcePlay();
 });
+window.addEventListener('pagehide',()=>saveLast());
 $('seek').addEventListener('input',e=>{
   if(validDuration()){
     au.currentTime=e.target.value/100*au.duration;
     countListenIfNeeded();
     updatePositionState();
+    saveLast();
   }
 });
 $('shuf').onclick=e=>{shuffle=!shuffle;e.currentTarget.classList.toggle('on-t',shuffle)};
@@ -1115,6 +1240,7 @@ async function loadNet(silent){
   }else if(!silent) toast('Русских треков пока мало — показаны доступные');
  }catch(e){if(!silent) toast('Нет связи с каталогом');}
  loading=false;fx();render();
+ if(!cur&&S.last) restoreLast();
 }
 
 // Auto-refresh catalog every 4 minutes so new releases appear
@@ -1144,7 +1270,13 @@ function startWelcome(){
 
 $('mP').innerHTML=I.play;$('pp').innerHTML=I.play;
 render();fx();
-load(()=>{render();ui();startWelcome();});
+load(()=>{
+  if(S.last&&S.last.id&&cache[S.last.id]&&!reg[S.last.id]) reg[S.last.id]=cache[S.last.id];
+  render();
+  if(S.last) restoreLast();
+  ui();
+  startWelcome();
+});
 loadNet();
 </script>
 </body>
