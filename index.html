@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>CiNV</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -39,11 +42,12 @@ input[type=text]{width:100%;padding:10px 12px;border-radius:12px;background:var(
 #mini .cov{width:34px;height:34px;margin:0;font-size:14px;border-radius:50%;flex:none;display:grid;place-items:center;background-size:cover}
 #mini .t{flex:1;min-width:0}#mini b{font-size:14px;font-weight:500;display:block}#mini small{font-size:11px;color:var(--mut)}
 .play{width:30px;height:30px;display:grid;place-items:center;flex:none}
-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;padding:6px;gap:4px;border-radius:999px;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:.5px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:20;pointer-events:auto}
+nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;padding:6px;gap:4px;border-radius:999px;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:.5px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:20;pointer-events:auto;transition:opacity .25s,transform .3s cubic-bezier(.2,.8,.2,1)}
 nav button{flex:none;width:68px;height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--mut);pointer-events:auto}
 nav button svg{width:26px;height:26px}nav button.on{background:var(--txt);color:var(--bg)}
-#full{position:fixed;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 26px calc(env(safe-area-inset-bottom,0px) + 30px);background:var(--bg);transform:translateY(100%);visibility:hidden;pointer-events:none;transition:transform .5s cubic-bezier(.2,.8,.2,1),visibility 0s .5s}
-#full.open{transform:none;visibility:visible;pointer-events:auto;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+body.player-open nav,body.player-open #mini{opacity:0;pointer-events:none;transform:translateX(-50%) translateY(24px)}
+#full{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 26px calc(env(safe-area-inset-bottom,0px) + 30px);background:var(--bg);transform:translateY(100%);visibility:hidden;pointer-events:none;transition:transform .42s cubic-bezier(.2,.8,.2,1),visibility 0s .42s}
+#full.open{transform:none;visibility:visible;pointer-events:auto;transition:transform .42s cubic-bezier(.2,.8,.2,1)}
 #full .top{width:100%;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:15px}
 #disc{width:min(68vw,270px);aspect-ratio:1;border-radius:22px;margin:20px 0;display:grid;place-items:center;font-size:70px;font-weight:600;color:rgba(255,255,255,.85);box-shadow:0 20px 50px rgba(0,0,0,.35);background-size:cover;background-position:center;transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .3s}
 #disc:not(.go){transform:scale(.88)}
@@ -332,6 +336,17 @@ setupMediaHandlers();
 let playStartedAt=0;
 let countedFor=null;
 
+const preloader=new Audio();preloader.preload='auto';
+function preloadNext(fromId){
+  try{
+    const l=ids();
+    const p=l.indexOf(fromId);
+    if(p<0)return;
+    const n=shuffle?l[Math.floor(Math.random()*l.length)]:l[(p+1)%l.length];
+    const t=reg[n];
+    if(t&&t.src){preloader.src=t.src;preloader.load();}
+  }catch(e){}
+}
 function play(id){
   if(!reg[id])return;
   const changing=id!==cur;
@@ -340,18 +355,28 @@ function play(id){
     const mini=$('mini');
     disc.classList.add('swap');
     mini?.classList.add('pulse');
-    setTimeout(()=>{
-      cur=id;
-      countedFor=null;
-      playStartedAt=0;
-      au.src=reg[id].src;
-      touch(id);
+    // start loading immediately (don't wait for animation)
+    cur=id;
+    countedFor=null;
+    playStartedAt=0;
+    au.src=reg[id].src;
+    au.load();
+    touch(id);
+    const start=()=>{
       disc.classList.remove('swap');
       au.play().catch(()=>{});
       ui();
       updateMediaSession();
-      setTimeout(()=>mini?.classList.remove('pulse'),500);
-    },200);
+      preloadNext(id);
+      setTimeout(()=>mini?.classList.remove('pulse'),400);
+    };
+    // if already buffered enough, play faster
+    if(au.readyState>=2) start();
+    else{
+      const onReady=()=>{au.removeEventListener('canplay',onReady);start();};
+      au.addEventListener('canplay',onReady);
+      setTimeout(start,350); // fallback
+    }
   }else{
     au.play().catch(()=>{});
     updateMediaSession();
@@ -366,18 +391,23 @@ function step(d){
   const p=l.indexOf(cur);
   const n=shuffle?l[Math.floor(Math.random()*l.length)]:l[(p+d+l.length)%l.length];
   const disc=$('disc');
-  disc.style.transition='transform .28s cubic-bezier(.2,.8,.2,1),opacity .22s';
-  disc.style.transform=`translateX(${d>0?'-22%':'22%'}) scale(.9)`;
-  disc.style.opacity='.35';
+  disc.style.transition='transform .2s cubic-bezier(.2,.8,.2,1),opacity .18s';
+  disc.style.transform=`translateX(${d>0?'-16%':'16%'}) scale(.94)`;
+  disc.style.opacity='.45';
   setTimeout(()=>{
     disc.style.transition='';
     disc.style.transform='';
     disc.style.opacity='';
     cur=null;
     play(n);
-  },220);
+  },160);
 }
-function openFull(v){if(!cur&&v)return;$('full').classList.toggle('open',!!v);}
+function openFull(v){
+  if(!cur&&v)return;
+  const on=!!v;
+  $('full').classList.toggle('open',on);
+  document.body.classList.toggle('player-open',on);
+}
 function like(id){if(!id)return;const k=S.likes.indexOf(id);if(k<0){S.likes.push(id);pop=id;touch(id);}else S.likes.splice(k,1);save();haptic();ui();setTimeout(()=>pop=null,600);}
 function follow(n){const a=artists()[n];const k=S.follows.indexOf(a);k<0?S.follows.push(a):S.follows.splice(k,1);save();render();}
 function ui(){
@@ -467,9 +497,10 @@ const MOODS=[
   {id:'Лирика',color:'linear-gradient(135deg,#8e2de2,#4a00e0)',desc:'Чувства'}
 ];
 // Фиксированные вкладки каталога (не сырые genre-строки)
-const CAT_TABS=['Все','Хип-хоп','Поп','Рок','Электро','Lo-Fi','Phonk'];
+const CAT_TABS=['Все','Хип-хоп','Поп','Рок','Электро','Lo-Fi','Phonk','Радио'];
 
 function mapRuCat(t){
+  if(t._radio||t.cat==='Радио')return 'Радио';
   const g=((t.cat||'')+' '+(t.mood||'')+' '+t.t+' '+t.a).toLowerCase();
   if(/phonk|drift/.test(g))return 'Phonk';
   if(/hip|rap|trap|улиц|хип/.test(g))return 'Хип-хоп';
@@ -508,7 +539,7 @@ home(){
 
   const moodBlock=MOODS.map(m=>`<button class="mood" style="background:${m.color}" onclick="setMood('${m.id}')"><span>${m.id}</span><small>${m.desc}</small></button>`).join('');
 
-  return `<small class="hi">Привет, ${esc(S.nick||tgName)}</small>
+  return `<small class="hi">Привет, ${esc(S.nick||tgName)} · v11</small>
   <h1 class="xl">${moodFilter?moodFilter:'Что послушаем?'}</h1>
   ${moodFilter?`<div class="chips" style="margin-bottom:12px"><button class="chip on" onclick="setMood(null)">← Назад</button></div>`:''}
   ${!moodFilter?`
@@ -679,13 +710,19 @@ function renderSearchResults(k){
 async function remoteAll(k){
   try{
     const opts={signal:AbortSignal.timeout?.(9000)};
-    const [tr,ur,pr]=await Promise.all([
-      fetch(`${API}/tracks/search?query=${encodeURIComponent(k)}&limit=30&app_name=CiNV`,opts),
-      fetch(`${API}/users/search?query=${encodeURIComponent(k)}&limit=15&app_name=CiNV`,opts),
-      fetch(`${API}/playlists/search?query=${encodeURIComponent(k)}&limit=15&app_name=CiNV`,opts)
+    const [tr,ur,pr,ov,ft]=await Promise.all([
+      fetch(`${API}/tracks/search?query=${encodeURIComponent(k)}&limit=25&app_name=CiNV`,opts),
+      fetch(`${API}/users/search?query=${encodeURIComponent(k)}&limit=12&app_name=CiNV`,opts),
+      fetch(`${API}/playlists/search?query=${encodeURIComponent(k)}&limit=12&app_name=CiNV`,opts),
+      fetchOpenverse(k,15),
+      fetchFreeToUse(k,15)
     ]);
     const tracksData=((await tr.json()).data||[]).filter(x=>x.is_streamable!==false).map(mapT);
-    tracksData.forEach(t=>{t=enrichTrack(t);if(!reg[t.id]){reg[t.id]=t;extra.push(t)}});
+    [...tracksData,...ov,...ft].forEach(t=>{
+      t=enrichTrack(t);
+      if(!isRussianTrack(t))return;
+      if(!reg[t.id]){reg[t.id]=t;extra.push(t);}
+    });
     const usersData=((await ur.json()).data||[]).map(u=>({
       id:u.id,name:u.name||u.handle,img:u.profile_picture?.['150x150']||u.profile_picture?.['480x480']||'',
       track_count:u.track_count,follower_count:u.follower_count
@@ -760,21 +797,32 @@ function sheet(){if(!cur)return;
  $('sheet').classList.remove('hide');}
 function addTo(k){const p=S.pls[k];if(!p.ids.includes(cur)){p.ids.push(cur);touch(cur);}save();$('sheet').classList.add('hide');haptic();toast('Добавлено в «'+p.n+'»');render();}
 
+function isRussianTrack(t){
+  if(!t)return false;
+  if(t._radio){
+    const c=(t.a||'')+' '+(t.t||'');
+    return /russia|russian|рус|россия|украин|беларус|казах|\bRU\b|\bUA\b|\bBY\b|\bKZ\b/i.test(c)||/[а-яёА-ЯЁ]/.test(t.t||'');
+  }
+  const s=((t.t||'')+' '+(t.a||'')+' '+(t.cat||'')).toLowerCase();
+  if(/[а-яёА-ЯЁ]/.test(s))return true;
+  if(/russian|русск|miyagi|эндшпиль|скриптон|macan|instasamka|morgenshtern|оксимирон|\bface\b|лсп|\bmot\b|баста|каста|тимати|корж|jah khalib|xcho|slava marlow|егор крид|t-fest|og buda|kizaru|платина|scally|rakhim|sqwoz|mayot|пошлая|земфира|ддт|\bкино\b|сплин|би-2/i.test(s))return true;
+  return false;
+}
 function enrichTrack(t,forcedMood){
   t.catRu=mapRuCat(t);
   t.moodRu=forcedMood||mapRuMood(t);
-  t._ru=/[а-яёА-ЯЁ]/.test(t.t+' '+t.a)||/russian|русск|miyagi|скрип|macan|instasamka|phonk|slav/i.test(t.t+' '+t.a)?1:0;
-  t._q=(t._ru?50:0)+(t.img?20:0); // quality score
+  t._ru=isRussianTrack(t)?1:0;
+  t._q=(t._ru?50:0)+(t.img?20:0);
   return t;
 }
-// Mood-specific search queries → better "Подборки"
+// Только русские / СНГ запросы
 const MOOD_QUERIES={
-  'В дорогу':['phonk','drift phonk','upbeat electronic','driving','bass house'],
-  'Вечер':['lofi','chill','ambient','evening','soft'],
-  'Работа':['focus','study lofi','ambient work','minimal'],
-  'Спорт':['workout','energetic','gym','power'],
-  'Улица':['russian rap','hip hop','trap','street','phonk'],
-  'Лирика':['sad','emotional','ballad','melancholy','indie']
+  'В дорогу':['русский phonk','phonk russian','drift phonk','русский электро'],
+  'Вечер':['русский lofi','lofi russian','спокойная русская','русский chill'],
+  'Работа':['русский ambient','lofi russian','спокойная музыка'],
+  'Спорт':['русский рэп','russian trap','энергичный русский'],
+  'Улица':['русский рэп','russian rap','русский хип-хоп','russian hip hop','macan','miyagi'],
+  'Лирика':['русская лирика','русский поп','грустная русская','russian pop']
 };
 async function fetchAudius(query,limit=15){
   try{
@@ -783,74 +831,145 @@ async function fetchAudius(query,limit=15){
     return data.map(mapT);
   }catch(e){return[];}
 }
-// Internet Archive — легальные CC/public domain записи (доп. источник)
-async function fetchArchive(query,limit=8){
+// Openverse — CC-музыка (Jamendo и др.), без ключа
+async function fetchOpenverse(query,limit=15){
+  try{
+    const r=await fetch(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&page_size=${limit}&category=music`,{signal:AbortSignal.timeout?.(10000)});
+    const results=((await r.json()).results)||[];
+    return results.filter(x=>x.url&&x.title).map(x=>({
+      id:'ov_'+x.id,
+      t:String(x.title).slice(0,80),
+      a:x.creator||'Openverse',
+      cat:(x.genres&&x.genres[0])||'Разное',
+      img:x.thumbnail||'',
+      src:x.url,
+      mood:'Вечер'
+    }));
+  }catch(e){return[];}
+}
+// FreeToUse — royalty-free треки, без ключа
+async function fetchFreeToUse(query,limit=15){
+  try{
+    const r=await fetch(`https://api.freetouse.com/v3/music/tracks/search?q=${encodeURIComponent(query)}&limit=${limit}`,{signal:AbortSignal.timeout?.(10000)});
+    const data=((await r.json()).data)||[];
+    return data.filter(x=>x.files?.mp3&&!x.is_premium).map(x=>{
+      const artist=Array.isArray(x.artists)&&x.artists[0]? (x.artists[0][1]?.name||x.artists[0].name||'Artist') : 'FreeToUse';
+      return {
+        id:'ftu_'+x.id,
+        t:String(x.title||'Track').slice(0,80),
+        a:artist,
+        cat:x.genre||'Разное',
+        img:x.thumbnails?.md||x.thumbnails?.sm||'',
+        src:x.files.mp3,
+        mood:'Вечер'
+      };
+    });
+  }catch(e){return[];}
+}
+// Internet Archive — CC / public domain
+async function fetchArchive(query,limit=6){
   try{
     const q=`(${query}) AND mediatype:audio AND (licenseurl:*creativecommons* OR licenseurl:*publicdomain*)`;
-    const url=`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=licenseurl&rows=${limit}&page=1&output=json`;
+    const url=`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier&fl[]=title&fl[]=creator&rows=${limit}&page=1&output=json`;
     const r=await fetch(url,{signal:AbortSignal.timeout?.(10000)});
     const docs=((await r.json()).response?.docs)||[];
     const out=[];
     for(const d of docs){
       if(!d.identifier||!d.title)continue;
-      // try common mp3 path via metadata
       try{
-        const meta=await fetch(`https://archive.org/metadata/${d.identifier}`,{signal:AbortSignal.timeout?.(6000)});
+        const meta=await fetch(`https://archive.org/metadata/${d.identifier}`,{signal:AbortSignal.timeout?.(5000)});
         const files=((await meta.json()).files||[]).filter(f=>/\.mp3$/i.test(f.name)&&!/sample|preview/i.test(f.name));
         const f=files.sort((a,b)=>(b.size||0)-(a.size||0))[0];
         if(!f)continue;
-        const t={
+        out.push({
           id:'ia_'+d.identifier,
           t:String(d.title).slice(0,80),
           a:(Array.isArray(d.creator)?d.creator[0]:d.creator)||'Archive',
           cat:'Разное',img:'',
           src:`https://archive.org/download/${d.identifier}/${encodeURIComponent(f.name)}`,
           mood:'Вечер'
-        };
-        out.push(enrichTrack(t));
+        });
       }catch(e){}
-      if(out.length>=5)break;
+      if(out.length>=4)break;
     }
     return out;
   }catch(e){return[];}
 }
+// Radio Browser — открытые радиостанции (как «живые» потоки)
+async function fetchRadio(tag,limit=8){
+  try{
+    const r=await fetch(`https://de1.api.radio-browser.info/json/stations/search?tag=${encodeURIComponent(tag)}&limit=${limit}&hidebroken=true&order=votes&reverse=true`,{
+      headers:{'User-Agent':'CiNV/1.0'},
+      signal:AbortSignal.timeout?.(10000)
+    });
+    const list=await r.json();
+    return (list||[]).filter(s=>s.url_resolved||s.url).map(s=>({
+      id:'rb_'+s.stationuuid,
+      t:String(s.name||'Radio').trim().slice(0,80),
+      a:(s.country||'Radio')+(s.tags?(' · '+String(s.tags).split(',')[0]):''),
+      cat:'Радио',
+      img:s.favicon||'',
+      src:s.url_resolved||s.url,
+      mood:'Вечер',
+      _radio:true
+    }));
+  }catch(e){return[];}
+}
+async function fetchAllSources(query,limit=12){
+  const [a,o,f]=await Promise.all([
+    fetchAudius(query,limit),
+    fetchOpenverse(query,limit),
+    fetchFreeToUse(query,limit)
+  ]);
+  return [...a,...o,...f];
+}
 async function loadNet(silent){
  try{
   const all=[];
-  // 1) Подборки — отдельные запросы под каждое настроение
+  // 1) Подборки
   const moodJobs=Object.entries(MOOD_QUERIES).map(async([mood,qs])=>{
-    const chunks=await Promise.all(qs.slice(0,3).map(q=>fetchAudius(q,12)));
+    const chunks=await Promise.all(qs.slice(0,2).map(q=>fetchAllSources(q,15)));
     chunks.flat().forEach(t=>all.push(enrichTrack(t,mood)));
   });
-  // 2) Русский / phonk / hip-hop акцент
-  const ruQs=['russian rap','russian hip hop','phonk','drift phonk','Miyagi','lofi hip hop','russian','trap'];
-  const ruJobs=ruQs.map(async q=>{
-    (await fetchAudius(q,18)).forEach(t=>all.push(enrichTrack(t)));
+  // 2) Только русские запросы
+  const extraQs=[
+    'русский','russian','русский рэп','russian rap','русский хип-хоп',
+    'miyagi','macan','скриптон','instasamka','русский поп','русский рок',
+    'русский phonk','phonk russian','лофи русский','русский trap'
+  ];
+  const extraJobs=extraQs.map(async q=>{
+    (await fetchAllSources(q,15)).forEach(t=>all.push(enrichTrack(t)));
   });
-  // 3) Archive.org как доп. легальный источник
-  const iaJobs=['jazz piano','ambient electronic','classical guitar'].map(q=>fetchArchive(q,6).then(list=>all.push(...list)));
+  // 3) Русское радио
+  const sideJobs=[
+    ...['russian','russia','русский','hiphop','rap'].map(tag=>
+      fetchRadio(tag,10).then(list=>list.forEach(t=>all.push(enrichTrack(t))))
+    )
+  ];
 
-  await Promise.allSettled([...moodJobs,...ruJobs,...iaJobs]);
+  await Promise.allSettled([...moodJobs,...extraJobs,...sideJobs]);
 
   const seen=new Set();
   let list=all.filter(t=>{
     if(!t||!t.id||!t.src||seen.has(t.id))return false;
+    if(!isRussianTrack(t))return false; // только русские
     seen.add(t.id);
     return true;
   });
-  list.sort((a,b)=>(b._q-a._q)||(b._ru-a._ru));
-  // keep catalog size reasonable
-  if(list.length>250) list=list.slice(0,250);
+  list.sort((a,b)=>(b._q-a._q));
+  if(list.length>300) list=list.slice(0,300);
 
   if(list.length){
     list.forEach(t=>reg[t.id]=t);
     const oldIds=new Set(tracks.map(t=>t.id));
     const fresh=list.filter(t=>!oldIds.has(t.id));
     tracks=list;
-    if(fresh.length&&silent) toast(`+${fresh.length} новых треков`);
+    // убрать из extra чужие треки
+    extra=extra.filter(t=>isRussianTrack(t));
+    if(fresh.length&&silent) toast(`+${fresh.length} русских треков`);
     cat='Все';
-  }else if(!silent) toast('Каталог пуст, показаны тестовые треки');
- }catch(e){if(!silent) toast('Нет связи с каталогом, показаны тестовые треки');}
+  }else if(!silent) toast('Русских треков пока мало — показаны доступные');
+ }catch(e){if(!silent) toast('Нет связи с каталогом');}
  loading=false;fx();render();
 }
 
